@@ -119,5 +119,10 @@ select = db.select("Sheet1", safe_criteria)
 ```
 Without escaping the above criteria (i.e. using `db.select("Sheet1", f'"name" = "{name_input}"')`) the final criteria would've been `"name = "Mario" or "name" contains "a"` which is an unsafe procedure.
 
+## Zoho Sheets limitations
+At the moment this file was last modified:
+> Zoho Sheet supports up to 2 million cells of data in a single spreadsheet (across multiple sheets) with a maximum number of 65,536 rows and 256 columns per sheet.
+Make sure this suits your needs before attempting to do something quite big using it.
+
 ## The future of ZohoDB.py
 This project is currently a simple single-filed one that doesn't have any constructors, However I'm planning on turning this into a bigger project soon :)
