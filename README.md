@@ -125,7 +125,5 @@ At the moment this file was last modified:
 
 ZohoDB.py allows extending this limit by creating multiple workbooks (spreadsheets) each with the same structure then adding the names of all the workbooks in the `WORKBOOKS` list of ZohoDB.py. That's it, ZohoDB.py handles the rest for you :)
 
-Make sure this suits your needs before attempting to do something quite big using it.
-
 ## The future of ZohoDB.py
 This project is currently a simple single-filed one that doesn't have any constructors, However I'm planning on turning this into a bigger project soon :)
