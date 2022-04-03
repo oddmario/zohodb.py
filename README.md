@@ -123,6 +123,8 @@ Without escaping the above criteria (i.e. using `db.select("Sheet1", f'"name" = 
 At the moment this file was last modified:
 > Zoho Sheet supports up to 2 million cells of data in a single spreadsheet (across multiple sheets) with a maximum number of 65,536 rows and 256 columns per sheet.
 
+ZohoDB.py allows extending this limit by creating multiple workbooks (spreadsheets) each with the same structure then adding the names of all the workbooks in the `WORKBOOKS` list of ZohoDB.py. That's it, ZohoDB.py handles the rest for you :)
+
 Make sure this suits your needs before attempting to do something quite big using it.
 
 ## The future of ZohoDB.py
