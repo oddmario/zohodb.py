@@ -107,7 +107,7 @@ print(update)
 The output should be `True`
 
 ### Escaping user input
-Escaping any values should be done only on the operations that takes a criteria argument. `insert` for example can take any values safely since it takes JSON as its input method
+Escaping any values should be done only on the operations that take a criteria argument. `insert` for example can take any values safely since it takes JSON as its input method
 ```py
 import zohodb as db
 
