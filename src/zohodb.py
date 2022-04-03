@@ -176,7 +176,7 @@ def update(table, criteria = "", data = {}, workbook_id = ""):
         })
         res = json.loads(req.text)
         if refresh_token(res):
-            return update(table, criteria, data)
+            return update(table, criteria, data, workbook_id)
         if res['status'] == "failure":
             raise Exception(res['error_message'])
         if res['no_of_affected_rows'] >= 1:
@@ -206,7 +206,7 @@ def delete(table, criteria = "", row_id = 0, workbook_id = ""):
         })
         res = json.loads(req.text)
         if refresh_token(res):
-            return delete(table, criteria)
+            return delete(table, criteria, row_id, workbook_id)
         if res['status'] == "failure":
             raise Exception(res['error_message'])
         if res['no_of_rows_deleted'] >= 1:
