@@ -2,8 +2,8 @@
 Use Zoho Sheets as a database server
 
 ## Configuration
-First of all make sure to set the `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET` and `WORKBOOK_NAME` variables.
-Check https://www.zoho.com/sheet/help/api/v2/#oauthregister in order to learn the procedure of obtaining a client ID & secret. The workbook name should be the name of your Zoho Sheets workbook. you can create one through the Zoho Sheets interface.
+First of all make sure to set the `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET` and `WORKBOOKS` variables.
+Check https://www.zoho.com/sheet/help/api/v2/#oauthregister in order to learn the procedure of obtaining a client ID & secret. The workbooks list should contain the name(s) of your Zoho Sheets workbook(s), you can create one through the Zoho Sheets interface.
 
 During your first ZohoDB.py query execution, you'll be asked in the console to follow a specific link so you can authorize your OAuth app, this step is done only once and the generated access token will be saved in your project directory and used for any further queries. (ZohoDB.py handles refreshing the access token whenever needed so no needa worry there)
 
