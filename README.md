@@ -124,9 +124,11 @@ Without escaping the above criteria (i.e. using `db.select(table="Sheet1", crite
 At the moment this file was last modified:
 > Zoho Sheet supports up to 2 million cells of data in a single spreadsheet (across multiple sheets) with a maximum number of 65,536 rows and 256 columns per sheet.
 
-ZohoDB.py allows extending this limit by creating multiple workbooks (spreadsheets) each with the same structure (*) then adding the names of all the workbooks in the `WORKBOOKS` list of ZohoDB.py. That's it, ZohoDB.py handles the rest for you :)
+ZohoDB.py allows extending this limit by creating multiple workbooks (spreadsheets) each with the same structure (*) then passing the names of all the workbooks as a list for the `workbooks` argument of `ZohoDB`. That's it, ZohoDB.py handles the rest for you :)
 
 (*): same structure means the same sheets (tables) and the same columns structure for each sheet.
 
-## The future of ZohoDB.py
-This project is currently a simple single-filed one that doesn't have any constructors, However I'm planning on turning this into a bigger project soon :)
+## The performance of ZohoDB.py
+ZohoDB.py currently doesn't have the best performance when it comes to inserting, updating or deleting data when we have more than a single workbook (spreadsheet) used. This is expected to become more efficient in the future. However for now you can pass a `workbook_id` argument to any of `update()` or `delete()` whenever possible. This will make the query run faster since ZohoDB will know which spreadsheet has the row we're trying to update or delete.
+
+As for `insert()` and if we have multiple workbooks, ZohoDB.py has to go through all of your workbooks to know which one can take the row(s) you're trying to insert. This also is expected to become faster in a future release :)
