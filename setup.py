@@ -1,3 +1,12 @@
+#
+# ZohoDB.py
+#
+# @oddmario
+# Mario
+# mariolatif741@yandex.com
+#
+# License: GNU GPLv3
+
 from setuptools import setup
 
 setup(
