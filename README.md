@@ -1,11 +1,24 @@
 # ZohoDB.py
 Use Zoho Sheets as a database server
 
-## Configuration
-First of all make sure to set the `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET` and `WORKBOOKS` variables.
+## Authentication
 Check https://www.zoho.com/sheet/help/api/v2/#oauthregister in order to learn the procedure of obtaining a client ID & secret. The workbooks list should contain the name(s) of your Zoho Sheets workbook(s), you can create one through the Zoho Sheets interface.
 
 During your first ZohoDB.py query execution, you'll be asked in the console to follow a specific link so you can authorize your OAuth app, this step is done only once and the generated access token will be saved in your project directory and used for any further queries. (ZohoDB.py handles refreshing the access token whenever needed so no needa worry there)
+
+## Usage
+```py
+from zohodb import zohodb
+
+handler = zohodb.ZohoAuthHandler("my Zoho client ID here", "my Zoho client secret here")
+db = zohodb.ZohoDB(handler, [
+    "Spreadsheet1"
+])
+
+query = db.insert(table="users", data=[{
+    "username": "Mario"
+}])
+```
 
 ## Criteria formatting
 **NOTICE:** Any strings must be surrounded by **double quotes (`"`)**, failing to do so will throw an "invalid criteria" exception.
@@ -47,37 +60,29 @@ Assume the following table as an example spreadsheet:
 
 ### Selecting data
 ```py
-import zohodb as db
-
-rows = db.select("Sheet1", '"name" = "Mario"')
+rows = db.select(table="Sheet1", criteria='"name" = "Mario"')
 print(len(rows))
 ```
 The output should be `1`
 
 ### Deleting data using criteria
 ```py
-import zohodb as db
-
-del = db.delete("Sheet1", '"name" = "Mario"')
+del = db.delete(table="Sheet1", criteria='"name" = "Mario"')
 print(del)
 ```
 The output should be `True`
 
 ### Deleting data using a row index
 ```py
-import zohodb as db
-
-row = db.select("Sheet1", '"name" = "Mario"')[0]
-del = db.delete("Sheet1", '', row['row_index'])
+row = db.select(table="Sheet1", criteria='"name" = "Mario"')[0]
+del = db.delete(table="Sheet1", criteria='', row_id=row['row_index'], workbook_id=row['workbook_id'])
 print(del)
 ```
 The output should be `True`
 
 ### Updating data
 ```py
-import zohodb as db
-
-update = db.update("Sheet1", '"name" = "Mario"', {
+update = db.update(table="Sheet1", criteria='"name" = "Mario"', data={
     "name": "Mario B."
 })
 print(update)
@@ -86,9 +91,7 @@ The output should be `True`
 
 ### Inserting data
 ```py
-import zohodb as db
-
-insert = db.insert("Sheet1", [
+insert = db.insert(table="Sheet1", data=[
     {
         "name": "User 1",
         "country": "N/A",
@@ -109,15 +112,13 @@ The output should be `True`
 ### Escaping user input
 Escaping any values should be done only on the operations that take a criteria argument. `insert` for example can take any values safely since it takes JSON as its input method
 ```py
-import zohodb as db
-
 name_input = 'Mario" or "name" contains "a' # This is an unsafe input
 safe_criteria = db.escape('"name" = ":name"', {
     ":name": name_input
 })
-select = db.select("Sheet1", safe_criteria)
+select = db.select(table="Sheet1", criteria=safe_criteria)
 ```
-Without escaping the above criteria (i.e. using `db.select("Sheet1", f'"name" = "{name_input}"')`) the final criteria would've been `"name = "Mario" or "name" contains "a"` which is an unsafe procedure.
+Without escaping the above criteria (i.e. using `db.select(table="Sheet1", criteria=f'"name" = "{name_input}"')`) the final criteria would've been `"name = "Mario" or "name" contains "a"` which is an unsafe procedure.
 
 ## Zoho Sheets limitations
 At the moment this file was last modified:
