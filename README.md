@@ -1,6 +1,12 @@
 # ZohoDB.py
 Use Zoho Sheets as a database server
 
+## Installation
+Using pip:
+```shell
+pip install zohodb.py
+```
+
 ## Authentication
 Check https://www.zoho.com/sheet/help/api/v2/#oauthregister in order to learn the procedure of obtaining a client ID & secret. The workbooks list should contain the name(s) of your Zoho Sheets workbook(s), you can create one through the Zoho Sheets interface.
 
