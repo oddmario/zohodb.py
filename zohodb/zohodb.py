@@ -265,6 +265,7 @@ class ZohoDB:
         else:
             workbook_id = str(kwargs['workbook_id']).strip()
         workbookids = self.workbookids()
+        return_bool = False
         for workbook in workbookids:
             if workbook_id and workbook_id != "":
                 workbook = workbook_id
@@ -279,12 +280,11 @@ class ZohoDB:
             if res['status'] == "failure":
                 raise Exception(res['error_message'])
             if res['no_of_affected_rows'] >= 1:
-                return True
-            else:
-                if workbook_id and workbook_id != "":
-                    break
-                continue
-        return False
+                return_bool = True
+            if workbook_id and workbook_id != "":
+                break
+            continue
+        return return_bool
         
     def delete(self, **kwargs):
         requireds = [
@@ -309,6 +309,7 @@ class ZohoDB:
         else:
             rowid = ""
         workbookids = self.workbookids()
+        return_bool = False
         for workbook in workbookids:
             if workbook_id and workbook_id != "":
                 workbook = workbook_id
@@ -324,9 +325,8 @@ class ZohoDB:
             if res['status'] == "failure":
                 raise Exception(res['error_message'])
             if res['no_of_rows_deleted'] >= 1:
-                return True
-            else:
-                if workbook_id and workbook_id != "":
-                    break
-                continue
-        return False
+                return_bool = True
+            if workbook_id and workbook_id != "":
+                break
+            continue
+        return return_bool
