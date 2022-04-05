@@ -28,8 +28,8 @@ def ZohoWorkbookRequest(workbook_id, data):
         return httpx.post(f"{ZOHO_SHEETS_API_BASE}/{workbook_id}", data=data, headers={
             "Authorization": f"Bearer {token}"
         })
-    except Exception as e:
-        raise Exception("A Zoho workbook request has failed.")
+    except httpx.RequestError as e:
+        raise Exception(f"A Zoho workbook request has failed: {e}")
 
 class ZohoAuthHandler:
     def __init__(self, client_id, client_secret):
@@ -62,7 +62,7 @@ class ZohoAuthHandler:
                 if key == 'code' or key == '?code':
                     code = val
                     break
-            except Exception as e:
+            except IndexError:
                 continue
         request_token_params = [
             f"code={code}",
@@ -74,12 +74,12 @@ class ZohoAuthHandler:
         ts = calendar.timegm(time.gmtime())
         try:
             tokenreq = httpx.post(f"{ZOHO_OAUTH_API_BASE}/token?" + "&".join(request_token_params))
-        except Exception as e:
-            raise Exception("Failed to request an access token")
+        except httpx.RequestError as e:
+            raise Exception(f"Failed to request an access token: {e}")
         try:
             tokenres = json.loads(tokenreq.text)
-        except Exception as e:
-            raise Exception("Failed to parse the token generation response")
+        except json.decoder.JSONDecodeError as e:
+            raise Exception(f"Failed to parse the token generation response: {e}")
         if not "access_token" in tokenres:
             raise Exception("Failed to obtain an access token")
         tokenres['created_at'] = ts
@@ -97,12 +97,12 @@ class ZohoAuthHandler:
         ts = calendar.timegm(time.gmtime())
         try:
             req = httpx.post(f"{ZOHO_OAUTH_API_BASE}/token?{req_params}")
-        except Exception as e:
-            raise Exception("Failed to request an access token renewal")
+        except httpx.RequestError as e:
+            raise Exception(f"Failed to request an access token renewal: {e}")
         try:    
             res = json.loads(req.text)
-        except Exception as e:
-            raise Exception("Failed to parse the token renewal response")
+        except json.decoder.JSONDecodeError as e:
+            raise Exception(f"Failed to parse the token renewal response: {e}")
         if not "access_token" in res:
             raise Exception("Failed to refresh the access token")
         with open(f"{self.cache_path}/token.json", "r") as f:
@@ -148,8 +148,8 @@ class ZohoDB:
             headers={
                 "Authorization": f"Bearer {self.AuthHandler.token()}"
             })
-        except Exception as e:
-            raise Exception("Failed to fetch the workbook(s) ID(s)")
+        except httpx.RequestError as e:
+            raise Exception(f"Failed to fetch the workbook(s) ID(s): {e}")
         res = json.loads(req.text)
         if res['status'] == "failure":
             raise Exception(res['error_message'])
