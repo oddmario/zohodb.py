@@ -73,7 +73,7 @@ class ZohoDBCache:
         self.cache_path = f"./.zohodb/db_cache/{self.hash}"
         Path(f"{self.cache_path}").mkdir(parents=True, exist_ok=True)
         
-    def set(table, key, value):
+    def set(self, table, key, value):
         if not Path(f"{self.cache_path}/{table}.json").exists():
             with open(f"{self.cache_path}/{table}.json", "w") as f:
                 data = {}
@@ -91,7 +91,7 @@ class ZohoDBCache:
                 return True
         return False
                 
-    def get(table, key):
+    def get(self, table, key):
         if not Path(f"{self.cache_path}/{table}.json").exists():
             raise InvalidCacheTable
         with open(f"{self.cache_path}/{table}.json", "r") as f:
@@ -104,7 +104,7 @@ class ZohoDBCache:
             else:
                 return None
                 
-    def delete(table, key):
+    def delete(self, table, key):
         if not Path(f"{self.cache_path}/{table}.json").exists():
             raise InvalidCacheTable
         with open(f"{self.cache_path}/{table}.json", "r") as f:
