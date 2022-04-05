@@ -19,9 +19,43 @@ from concurrent.futures import ThreadPoolExecutor
 ZOHO_OAUTH_API_BASE = "https://accounts.zoho.com/oauth/v2"
 ZOHO_SHEETS_API_BASE = "https://sheet.zoho.com/api/v2"
 
+# ----- Exception classes -----
+class EmptyInput(Exception):
+    """Thrown when an argument value is empty"""
+    pass
+
+class InvalidType(Exception):
+    """Thrown when the wrong type/instance is used"""
+    pass
+
+class InvalidJsonResponse(Exception):
+    """Thrown when an invalid/malformed JSON response is received"""
+    pass
+
+class UnexpectedResponse(Exception):
+    """Thrown when the response received is missing a key we want"""
+    pass
+
+class HttpRequestError(Exception):
+    """Thrown on the occurence of a HttpX request error"""
+    pass
+
+class MissingData(Exception):
+    """Thrown when a requirement is missing"""
+    pass
+
+class InvalidCacheTable(Exception):
+    """Thrown when the specified cache table doesn't exist"""
+    pass
+
+class CorruptedCacheTable(Exception):
+    """Thrown when a cache table contains malformed JSON data"""
+    pass
+# ----------
+
 def ZohoWorkbookRequest(workbook_id, data):
     if not "access_token" in data:
-        raise Exception("Missing the access token used for authentication")
+        raise MissingData("Missing the access token used for authentication")
     token = str(data['access_token']).strip()
     del data['access_token']
     try:
@@ -29,14 +63,70 @@ def ZohoWorkbookRequest(workbook_id, data):
             "Authorization": f"Bearer {token}"
         })
     except httpx.RequestError as e:
-        raise Exception(f"A Zoho workbook request has failed: {e}")
+        raise HttpRequestError(f"A Zoho workbook request has failed: {e}")
+        
+class ZohoDBCache:
+    def __init__(self, hash):
+        if not hash:
+            raise MissingData("The cache hash is required")
+        self.hash = hash
+        self.cache_path = f"./.zohodb/db_cache/{self.hash}"
+        Path(f"{self.cache_path}").mkdir(parents=True, exist_ok=True)
+        
+    def set(table, key, value):
+        if not Path(f"{self.cache_path}/{table}.json").exists():
+            with open(f"{self.cache_path}/{table}.json", "w") as f:
+                data = {}
+                data[key] = value
+                f.write(json.dumps(data))
+                return True
+        with open(f"{self.cache_path}/{table}.json", "r") as f:
+            try:
+                data = json.loads(f.read())
+            except json.decoder.JSONDecodeError:
+                raise CorruptedCacheTable
+            data[key] = value
+            with open(f"{self.cache_path}/{table}.json", "w") as fw:
+                fw.write(json.dumps(data))
+                return True
+        return False
+                
+    def get(table, key):
+        if not Path(f"{self.cache_path}/{table}.json").exists():
+            raise InvalidCacheTable
+        with open(f"{self.cache_path}/{table}.json", "r") as f:
+            try:
+                data = json.loads(f.read())
+            except json.decoder.JSONDecodeError:
+                raise CorruptedCacheTable
+            if key in data:
+                return data[key]
+            else:
+                return None
+                
+    def delete(table, key):
+        if not Path(f"{self.cache_path}/{table}.json").exists():
+            raise InvalidCacheTable
+        with open(f"{self.cache_path}/{table}.json", "r") as f:
+            try:
+                data = json.loads(f.read())
+            except json.decoder.JSONDecodeError:
+                raise CorruptedCacheTable
+            if key in data:
+                del data[key]
+            else:
+                return False
+            with open(f"{self.cache_path}/{table}.json", "w") as fw:
+                fw.write(json.dumps(data))
+                return True
+        return False
 
 class ZohoAuthHandler:
     def __init__(self, client_id, client_secret):
         self.client_id = client_id
         self.client_secret = client_secret
         if not self.client_id or not self.client_secret:
-            raise Exception("Missing the Zoho authentication credentials")
+            raise MissingData("Missing the Zoho authentication credentials")
         self.hash = hashlib.md5((str(self.client_id) + ":" + str(self.client_secret)).encode('utf-8')).hexdigest()
         self.cache_path = f"./.zohodb/auth_cache/{self.hash}"
         Path(f"{self.cache_path}").mkdir(parents=True, exist_ok=True)
@@ -75,13 +165,13 @@ class ZohoAuthHandler:
         try:
             tokenreq = httpx.post(f"{ZOHO_OAUTH_API_BASE}/token?" + "&".join(request_token_params))
         except httpx.RequestError as e:
-            raise Exception(f"Failed to request an access token: {e}")
+            raise HttpRequestError(f"Failed to request an access token: {e}")
         try:
             tokenres = json.loads(tokenreq.text)
         except json.decoder.JSONDecodeError as e:
-            raise Exception(f"Failed to parse the token generation response: {e}")
+            raise InvalidJsonResponse(f"Failed to parse the token generation response: {e}")
         if not "access_token" in tokenres:
-            raise Exception("Failed to obtain an access token")
+            raise UnexpectedResponse("Failed to obtain an access token")
         tokenres['created_at'] = ts
         with open(f"{self.cache_path}/token.json", "w") as f:
             f.write(json.dumps(tokenres))
@@ -98,13 +188,13 @@ class ZohoAuthHandler:
         try:
             req = httpx.post(f"{ZOHO_OAUTH_API_BASE}/token?{req_params}")
         except httpx.RequestError as e:
-            raise Exception(f"Failed to request an access token renewal: {e}")
+            raise HttpRequestError(f"Failed to request an access token renewal: {e}")
         try:    
             res = json.loads(req.text)
         except json.decoder.JSONDecodeError as e:
-            raise Exception(f"Failed to parse the token renewal response: {e}")
+            raise InvalidJsonResponse(f"Failed to parse the token renewal response: {e}")
         if not "access_token" in res:
-            raise Exception("Failed to refresh the access token")
+            raise UnexpectedResponse("Failed to refresh the access token")
         with open(f"{self.cache_path}/token.json", "r") as f:
             data = json.loads(f.read())
             data['access_token'] = res['access_token']
@@ -129,18 +219,17 @@ class ZohoAuthHandler:
 class ZohoDB:
     def __init__(self, AuthHandler, workbooks, max_threads = 24):
         if not isinstance(AuthHandler, ZohoAuthHandler):
-            raise Exception("Invalid ZohoAuthHandler instance passed")
+            raise InvalidType("Invalid ZohoAuthHandler instance passed")
         if not isinstance(workbooks, list):
-            raise Exception("Invalid workbooks list passed")
+            raise InvalidJsonResponse("Invalid workbooks list passed")
         if len(workbooks) <= 0:
-            raise Exception("Couldn't find any workbook names to use")
+            raise EmptyInput("Couldn't find any workbook names to use")
         self.AuthHandler = AuthHandler
         self.workbooks = workbooks
         self.max_threads = int(max_threads)
         self.hash = hashlib.md5(str(self.workbooks).encode('utf-8')).hexdigest()
-        self.cache_path = f"./.zohodb/workbooks_cache/{self.hash}"
-        Path(f"{self.cache_path}").mkdir(parents=True, exist_ok=True)
-     
+        self.cache = ZohoDBCache(self.hash)
+
     def __fetch_workbooks(self):
         workbookids = []
         try:
@@ -149,32 +238,26 @@ class ZohoDB:
                 "Authorization": f"Bearer {self.AuthHandler.token()}"
             })
         except httpx.RequestError as e:
-            raise Exception(f"Failed to fetch the workbook(s) ID(s): {e}")
+            raise HttpRequestError(f"Failed to fetch the workbook(s) ID(s): {e}")
         res = json.loads(req.text)
         if res['status'] == "failure":
-            raise Exception(res['error_message'])
+            raise UnexpectedResponse(res['error_message'])
         for workbook in res['workbooks']:
             if workbook['workbook_name'] in self.workbooks:
                 workbookids.append(workbook['resource_id'])
         if not workbookids or workbookids == []:
-            raise Exception("Unable to find any workbooks with the name(s) specified")
-        with open(f"{self.cache_path}/workbooks.json", "w") as f:
-            f.write(json.dumps({
-                "workbooks": workbookids
-            }))
+            raise UnexpectedResponse("Unable to find any workbooks with the name(s) specified")
+        self.cache.set("workbooks", "workbooks", workbookids)
         return workbookids
         
     def workbookids(self):
-        if not Path(f"{self.cache_path}/workbooks.json").exists():
-            with open(f"{self.cache_path}/workbooks.json", "w") as f:
-                f.write("{}")
-        with open(f"{self.cache_path}/workbooks.json", "r") as f:
-            data = json.loads(f.read())
-            if not "workbooks" in data:
-                return self.__fetch_workbooks()
-            if len(data['workbooks']) <= 0:
-                return self.__fetch_workbooks()
-            return data['workbooks']
+        try:
+            wbs = self.cache.get("workbooks", "workbooks")
+        except InvalidCacheTable:
+            return self.__fetch_workbooks()
+        if wbs == None or len(wbs) <= 0:
+            return self.__fetch_workbooks()
+        return wbs
             
     def escape(self, criteria, parameters):
         for k, v in parameters.items():
@@ -190,7 +273,7 @@ class ZohoDB:
         ]
         for required in requireds:
             if not required in kwargs:
-                raise Exception(f"Missing the required argument '{required}'")
+                raise MissingData(f"Missing the required argument '{required}'")
         table = str(kwargs['table'])
         criteria = str(kwargs['criteria'])
         if not "columns" in kwargs:
@@ -198,7 +281,7 @@ class ZohoDB:
         else:
             columns = kwargs['columns']
         if not isinstance(columns, list):
-            raise Exception("columns must be a list")
+            raise InvalidType("columns must be a list")
         workbookids = self.workbookids()
         responses = []
         returned = []
@@ -213,7 +296,7 @@ class ZohoDB:
         for index, res in enumerate(responses):
             res = json.loads(res.text)
             if res['status'] == "failure":
-                raise Exception(res['error_message'])
+                raise UnexpectedResponse(res['error_message'])
             returned.extend([dict(record, **{'workbook_id': workbookids[index]}) for record in res['records']])
         return returned
         
@@ -224,11 +307,11 @@ class ZohoDB:
         ]
         for required in requireds:
             if not required in kwargs:
-                raise Exception(f"Missing the required argument '{required}'")
+                raise MissingData(f"Missing the required argument '{required}'")
         table = str(kwargs['table'])
         data = kwargs['data']
         if not isinstance(data, list):
-            raise Exception("data must be a list")
+            raise InvalidType("data must be a list")
         workbookids = self.workbookids()
         for workbook in workbookids:
             req = ZohoWorkbookRequest(workbook, {
@@ -242,7 +325,7 @@ class ZohoDB:
                 if res['error_code'] == 2870 or res['error_code'] == 2872:
                     continue
             if res['status'] == "failure":
-                raise Exception(res['error_message'])
+                raise UnexpectedResponse(res['error_message'])
             return True
         return False
         
@@ -254,12 +337,12 @@ class ZohoDB:
         ]
         for required in requireds:
             if not required in kwargs:
-                raise Exception(f"Missing the required argument '{required}'")
+                raise MissingData(f"Missing the required argument '{required}'")
         table = str(kwargs['table'])
         criteria = str(kwargs['criteria'])
         data = kwargs['data']
         if not isinstance(data, dict):
-            raise Exception("data must be a dictionary")
+            raise InvalidType("data must be a dictionary")
         if not "workbook_id" in kwargs:
             workbook_id = ""
         else:
@@ -278,7 +361,7 @@ class ZohoDB:
             })
             res = json.loads(req.text)
             if res['status'] == "failure":
-                raise Exception(res['error_message'])
+                raise UnexpectedResponse(res['error_message'])
             if res['no_of_affected_rows'] >= 1:
                 return_bool = True
             if workbook_id and workbook_id != "":
@@ -293,7 +376,7 @@ class ZohoDB:
         ]
         for required in requireds:
             if not required in kwargs:
-                raise Exception(f"Missing the required argument '{required}'")
+                raise MissingData(f"Missing the required argument '{required}'")
         table = str(kwargs['table'])
         criteria = str(kwargs['criteria'])
         if not "workbook_id" in kwargs:
@@ -323,7 +406,7 @@ class ZohoDB:
             })
             res = json.loads(req.text)
             if res['status'] == "failure":
-                raise Exception(res['error_message'])
+                raise UnexpectedResponse(res['error_message'])
             if res['no_of_rows_deleted'] >= 1:
                 return_bool = True
             if workbook_id and workbook_id != "":

@@ -12,7 +12,7 @@ from setuptools import setup
 
 setup(
     name='zohodb.py',
-    version='1.0.1',
+    version='1.0.2',
     description='Use Zoho Sheets as a database server',
     license='GNU GPLv3',
     packages=['zohodb'],
