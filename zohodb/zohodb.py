@@ -7,6 +7,7 @@
 #
 # License: GNU GPLv3
 
+import os
 import httpx
 import json
 import urllib.parse
@@ -342,6 +343,15 @@ class ZohoDB:
             raise InvalidType("data must be a list")
         workbookids = self.workbookids()
         for workbook in workbookids:
+            try:
+                cached_ts = self.cache.get("full_workbooks", str(workbook))
+                if cached_ts != None:
+                    if (cached_ts + 3600) <= calendar.timegm(time.gmtime()):
+                        self.cache.delete("full_workbooks", str(workbook))
+                    else:
+                        break
+            except InvalidCacheTable:
+                pass
             req = ZohoWorkbookRequest(workbook, {
                 "access_token": self.AuthHandler.token(),
                 "method": "worksheet.records.add",
@@ -351,6 +361,7 @@ class ZohoDB:
             res = json.loads(req.text)
             if "error_code" in res:
                 if res['error_code'] == 2870 or res['error_code'] == 2872:
+                    self.cache.set("full_workbooks", str(workbook), calendar.timegm(time.gmtime()))
                     continue
             if res['status'] == "failure":
                 raise UnexpectedResponse(res['error_message'])
@@ -375,12 +386,9 @@ class ZohoDB:
             workbook_id = ""
         else:
             workbook_id = str(kwargs['workbook_id']).strip()
-        workbookids = self.workbookids()
         return_bool = False
-        for workbook in workbookids:
-            if workbook_id and workbook_id != "":
-                workbook = workbook_id
-            req = ZohoWorkbookRequest(workbook, {
+        if workbook_id and workbook_id != "":
+            req = ZohoWorkbookRequest(workbook_id, {
                 "access_token": self.AuthHandler.token(),
                 "method": "worksheet.records.update",
                 "worksheet_name": table,
@@ -392,9 +400,23 @@ class ZohoDB:
                 raise UnexpectedResponse(res['error_message'])
             if res['no_of_affected_rows'] >= 1:
                 return_bool = True
-            if workbook_id and workbook_id != "":
-                break
-            continue
+        else:
+            responses = []
+            workbookids = self.workbookids()
+            with ThreadPoolExecutor(max_workers=self.max_threads) as pool:
+                responses = list(pool.map(ZohoWorkbookRequest, workbookids, [{
+                    "access_token": self.AuthHandler.token(),
+                    "method": "worksheet.records.update",
+                    "worksheet_name": table,
+                    "criteria": criteria,
+                    "data": json.dumps(data)
+                }]))
+            for res in responses:
+                res = json.loads(res.text)
+                if res['status'] == "failure":
+                    raise UnexpectedResponse(res['error_message'])
+                if res['no_of_affected_rows'] >= 1:
+                    return_bool = True
         return return_bool
         
     def delete(self, **kwargs):
@@ -419,12 +441,10 @@ class ZohoDB:
             rowid = json.dumps([row_id])
         else:
             rowid = ""
-        workbookids = self.workbookids()
         return_bool = False
-        for workbook in workbookids:
-            if workbook_id and workbook_id != "":
-                workbook = workbook_id
-            req = ZohoWorkbookRequest(workbook, {
+        affected_workbooks = []
+        if workbook_id and workbook_id != "":
+            req = ZohoWorkbookRequest(workbook_id, {
                 "access_token": self.AuthHandler.token(),
                 "method": "worksheet.records.delete",
                 "worksheet_name": table,
@@ -436,8 +456,33 @@ class ZohoDB:
             if res['status'] == "failure":
                 raise UnexpectedResponse(res['error_message'])
             if res['no_of_rows_deleted'] >= 1:
+                if not workbook_id in affected_workbooks:
+                    affected_workbooks.append(workbook_id)
                 return_bool = True
-            if workbook_id and workbook_id != "":
-                break
-            continue
+        else:
+            responses = []
+            workbookids = self.workbookids()
+            with ThreadPoolExecutor(max_workers=self.max_threads) as pool:
+                responses = list(pool.map(ZohoWorkbookRequest, workbookids, [{
+                    "access_token": self.AuthHandler.token(),
+                    "method": "worksheet.records.delete",
+                    "worksheet_name": table,
+                    "criteria": criteria,
+                    "row_array": rowid,
+                    "delete_rows": "true"
+                }]))
+            for index, res in enumerate(responses):
+                res = json.loads(res.text)
+                if res['status'] == "failure":
+                    raise UnexpectedResponse(res['error_message'])
+                if res['no_of_rows_deleted'] >= 1:
+                    if not workbookids[index] in affected_workbooks:
+                        affected_workbooks.append(workbookids[index])
+                    return_bool = True
+        if return_bool == True:
+            for workbook in affected_workbooks:
+                try:
+                    self.cache.delete("full_workbooks", str(workbook))
+                except InvalidCacheTable:
+                    pass
         return return_bool
