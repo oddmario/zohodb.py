@@ -86,7 +86,7 @@ class ZohoDBCache:
         open(f"{self.cache_path}/{table}.lock", 'a').close()
         return True
         
-    def __release(self, table);
+    def __release(self, table):
         if Path(f"{self.cache_path}/{table}.lock").exists():
             os.remove(f"{self.cache_path}/{table}.lock")
         return True
