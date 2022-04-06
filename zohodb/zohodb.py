@@ -73,23 +73,48 @@ class ZohoDBCache:
         self.cache_path = f"./.zohodb/db_cache/{self.hash}"
         Path(f"{self.cache_path}").mkdir(parents=True, exist_ok=True)
         
+    def __wait_till_released(self, table):
+        while True:
+            if Path(f"{self.cache_path}/{table}.lock").exists():
+                time.sleep(1)
+                continue
+            else:
+                break
+        return True
+        
+    def __lock(self, table):
+        open(f"{self.cache_path}/{table}.lock", 'a').close()
+        return True
+        
+    def __release(self, table);
+        if Path(f"{self.cache_path}/{table}.lock").exists():
+            os.remove(f"{self.cache_path}/{table}.lock")
+        return True
+            
+    def __release_and_return(self, return_value, table):
+        self.__release(table)
+        return return_value
+
     def set(self, table, key, value):
+        self.__wait_till_released(table)
+        self.__lock(table)
         if not Path(f"{self.cache_path}/{table}.json").exists():
             with open(f"{self.cache_path}/{table}.json", "w") as f:
                 data = {}
                 data[key] = value
                 f.write(json.dumps(data))
-                return True
+                return self.__release_and_return(True, table)
         with open(f"{self.cache_path}/{table}.json", "r") as f:
             try:
                 data = json.loads(f.read())
             except json.decoder.JSONDecodeError:
+                self.__release(table)
                 raise CorruptedCacheTable
             data[key] = value
             with open(f"{self.cache_path}/{table}.json", "w") as fw:
                 fw.write(json.dumps(data))
-                return True
-        return False
+                return self.__release_and_return(True, table)
+        return self.__release_and_return(False, table)
                 
     def get(self, table, key):
         if not Path(f"{self.cache_path}/{table}.json").exists():
@@ -107,19 +132,22 @@ class ZohoDBCache:
     def delete(self, table, key):
         if not Path(f"{self.cache_path}/{table}.json").exists():
             raise InvalidCacheTable
+        self.__wait_till_released(table)
+        self.__lock(table)
         with open(f"{self.cache_path}/{table}.json", "r") as f:
             try:
                 data = json.loads(f.read())
             except json.decoder.JSONDecodeError:
+                self.__release(table)
                 raise CorruptedCacheTable
             if key in data:
                 del data[key]
             else:
-                return False
+                return self.__release_and_return(False, table)
             with open(f"{self.cache_path}/{table}.json", "w") as fw:
                 fw.write(json.dumps(data))
-                return True
-        return False
+                return self.__release_and_return(True, table)
+        return self.__release_and_return(False, table)
 
 class ZohoAuthHandler:
     def __init__(self, client_id, client_secret):
